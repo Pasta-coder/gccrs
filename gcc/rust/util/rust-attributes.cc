@@ -866,6 +866,28 @@ AttributeChecker::visit (AST::Function &fun)
 	}
       else if (result.name == "no_mangle")
 	check_no_mangle_function (attribute, fun);
+      else if (result.name == Attrs::TARGET_FEATURE)
+	{
+	  if (!fun.get_qualifiers ().is_unsafe ())
+	    {
+	      rust_error_at (
+		attribute.get_locus (),
+		"the %<#[target_feature]%> attribute can only be applied "
+		"to %<unsafe%> functions");
+	    }
+	}
+      else if (result.name == Attrs::ALLOW || result.name == "deny"
+	       || result.name == "warn" || result.name == "forbid")
+	{
+	  if (!attribute.has_attr_input ())
+	    {
+	      rust_error_at (attribute.get_locus (),
+			     "malformed %qs attribute input", name);
+	      rust_inform (attribute.get_locus (),
+			   "must be of the form: %<#[%s(lint1, lint2, ...)]%>",
+			   name);
+	    }
+	}
     }
   if (fun.has_body ())
     fun.get_definition ().value ()->accept_vis (*this);
