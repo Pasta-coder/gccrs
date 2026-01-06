@@ -40,14 +40,9 @@ DeriveVisitor::derive (Item &item, const Attribute &attr,
 {
   auto loc = attr.get_locus ();
 
-  using Kind = AST::Item::Kind;
-  auto item_kind = item.get_item_kind ();
-  if (item_kind != Kind::Enum && item_kind != Kind::Struct
-      && item_kind != Kind::Union)
+  if (!DeriveVisitor::validate_item (item, attr))
     {
-      rust_error_at (loc,
-		     "derive may only be applied to structs, enums and unions");
-      return {};
+      return std::vector<std::unique_ptr<Item>> ();
     }
 
   switch (to_derive)
@@ -157,6 +152,21 @@ DeriveVisitor::setup_impl_generics (
 	: builder.single_generic_type_path (type_name, generic_args_for_self);
 
   return ImplGenerics{std::move (self_type_path), std::move (impl_generics)};
+}
+
+bool
+DeriveVisitor::validate_item (const Item &item, const Attribute &attr)
+{
+  using Kind = AST::Item::Kind;
+  auto item_kind = item.get_item_kind ();
+
+  if (item_kind == Kind::Enum || item_kind == Kind::Struct
+      || item_kind == Kind::Union)
+    return true;
+
+  rust_error_at (attr.get_locus (),
+		 "derive may only be applied to structs, enums and unions");
+  return false;
 }
 
 } // namespace AST

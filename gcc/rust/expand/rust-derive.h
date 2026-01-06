@@ -71,6 +71,7 @@ protected:
     = tl::nullopt) const;
 
 private:
+  static bool validate_item (const AST::Item &item, const Attribute &attr);
   // the 4 "allowed" visitors, which a derive-visitor can specify and override
   virtual void visit_struct (StructStruct &struct_item) = 0;
   virtual void visit_tuple (TupleStruct &tuple_item) = 0;
