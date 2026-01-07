@@ -1099,8 +1099,7 @@ WitnessPat::to_string () const
       break;
     case Constructor::ConstructorKind::INT_RANGE:
       {
-	// TODO: implement
-	rust_unreachable ();
+	return ctor.to_string ();
       }
       break;
     case Constructor::ConstructorKind::WILDCARD:
@@ -1133,6 +1132,7 @@ WitnessMatrix::apply_constructor (const Constructor &ctor,
   switch (ctor.get_kind ())
     {
     case Constructor::ConstructorKind::WILDCARD:
+    case Constructor::ConstructorKind::INT_RANGE:
       {
 	arity = 0;
       }
@@ -1436,8 +1436,47 @@ lower_pattern (Resolver::TypeCheckContext *ctx, HIR::Pattern &pattern,
       break;
     case HIR::Pattern::PatternType::LITERAL:
       {
-	// TODO: unimplemented. Treat this pattern as wildcard for now.
-	return DeconstructedPat::make_wildcard (pattern.get_locus ());
+	HIR::LiteralPattern &lit_pattern
+	  = static_cast<HIR::LiteralPattern &> (pattern);
+	HIR::Literal &literal = lit_pattern.get_literal ();
+
+	int64_t value = 0;
+	switch (literal.get_lit_type ())
+	  {
+	  case HIR::Literal::LitType::INT:
+	    {
+	      std::string s = literal.as_string ();
+	      const char *s_ptr = s.c_str ();
+	      char *endptr = nullptr;
+	      errno = 0;
+	      value = std::strtoll (s_ptr, &endptr, 10);
+	      if (s_ptr == endptr || errno == ERANGE)
+		{
+		  return DeconstructedPat::make_wildcard (pattern.get_locus ());
+		}
+	    }
+	    break;
+	  case HIR::Literal::LitType::BOOL:
+	    value = (literal.as_string () == "true") ? 1 : 0;
+	    break;
+	  case HIR::Literal::LitType::CHAR:
+	    {
+	      std::string s = literal.as_string ();
+	      // TODO: This needs robust handling for escapes/unicode.
+	      if (s.length () >= 2 && s.front () == '\'' && s.back () == '\'')
+		value = (int64_t) s[1];
+	      else if (s.length () == 1)
+		value = (int64_t) s[0];
+	      else
+		value = 0;
+	    }
+	    break;
+	  default:
+	    return DeconstructedPat::make_wildcard (pattern.get_locus ());
+	  }
+
+	return DeconstructedPat (Constructor::make_int_range (value, value), 0,
+				 {}, pattern.get_locus ());
       }
       break;
     case HIR::Pattern::PatternType::RANGE:
@@ -1486,22 +1525,33 @@ split_constructors (std::vector<Constructor> &ctors, PlaceInfo &place_info)
 			     {Constructor::make_wildcard ()}),
 			   std::set<Constructor> ());
 
-  // TODO: only support enums and structs for now.
   TyTy::BaseType *ty = place_info.get_type ();
-  rust_assert (ty->get_kind () == TyTy::TypeKind::ADT);
-  TyTy::ADTType *adt = static_cast<TyTy::ADTType *> (ty);
-  rust_assert (adt->is_enum () || adt->is_struct_struct ()
-	       || adt->is_tuple_struct ());
-
   std::set<Constructor> universe;
-  if (adt->is_enum ())
+
+  if (ty->get_kind () == TyTy::TypeKind::BOOL)
     {
-      for (size_t i = 0; i < adt->get_variants ().size (); i++)
-	universe.insert (Constructor::make_variant (i));
+      universe.insert (Constructor::make_int_range (0, 0));
+      universe.insert (Constructor::make_int_range (1, 1));
     }
-  else if (adt->is_struct_struct () || adt->is_tuple_struct ())
+  else if (ty->get_kind () == TyTy::TypeKind::ADT)
     {
-      universe.insert (Constructor::make_struct ());
+      TyTy::ADTType *adt = static_cast<TyTy::ADTType *> (ty);
+      rust_assert (adt->is_enum () || adt->is_struct_struct ()
+		   || adt->is_tuple_struct ());
+
+      if (adt->is_enum ())
+	{
+	  for (size_t i = 0; i < adt->get_variants ().size (); i++)
+	    universe.insert (Constructor::make_variant (i));
+	}
+      else if (adt->is_struct_struct () || adt->is_tuple_struct ())
+	{
+	  universe.insert (Constructor::make_struct ());
+	}
+    }
+  else
+    {
+      universe.insert (Constructor::make_wildcard ());
     }
 
   std::set<Constructor> present;

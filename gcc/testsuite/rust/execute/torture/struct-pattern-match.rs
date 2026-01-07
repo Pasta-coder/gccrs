@@ -8,6 +8,7 @@ fn main() -> i32 {
     match x {
         Foo::A { x: 10 } => 1,
         Foo::B { y: 11 } => 2,
-        Foo::A { x: abc } => { abc - 12 }
+        Foo::A { x: abc } => { abc - 12 },
+        _ => 0,
     }
 }

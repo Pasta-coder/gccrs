@@ -227,6 +227,14 @@ public:
     return c;
   }
 
+  static Constructor make_int_range (int64_t lo, int64_t hi)
+  {
+    Constructor c (ConstructorKind::INT_RANGE);
+    c.int_range.lo = lo;
+    c.int_range.hi = hi;
+    return c;
+  }
+
   ConstructorKind get_kind () const { return kind; }
 
   int get_variant_index () const
