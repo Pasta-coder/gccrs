@@ -896,6 +896,12 @@ AttributeChecker::visit (AST::Function &fun)
 			   "must be of the form: %<#[link_name = \"name\"]%>");
 	    }
 	}
+      else if (result.name == Attrs::REPR)
+	{
+	  rust_error_at (
+	    attribute.get_locus (),
+	    "attribute should be applied to a struct, enum, or union");
+	}
     }
   if (fun.has_body ())
     fun.get_definition ().value ()->accept_vis (*this);
