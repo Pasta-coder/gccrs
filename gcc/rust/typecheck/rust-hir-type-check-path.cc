@@ -241,6 +241,54 @@ TypeCheckExpr::visit (HIR::PathInExpression &expr)
     }
 }
 
+/* Helper to check if a const generic expression is dependent (symbolic).
+   Returns true if the expression contains paths or identifiers (e.g., { N + 1
+   }). Returns false if the expression is purely literal/concrete (e.g., { 1 + 1
+   }).  */
+static bool
+is_const_dependent (HIR::Expr &expr)
+{
+  switch (expr.get_expression_type ())
+    {
+    case HIR::Expr::ExprType::Path:
+      return true;
+
+    case HIR::Expr::ExprType::Lit:
+      return false;
+
+    case HIR::Expr::ExprType::Block:
+      {
+	auto &block = static_cast<HIR::BlockExpr &> (expr);
+	if (block.has_expr ())
+	  // get_final_expr returns Reference -> No '*'
+	  return is_const_dependent (block.get_final_expr ());
+
+	if (!block.get_statements ().empty ())
+	  return true;
+
+	return false;
+      }
+
+    case HIR::Expr::ExprType::Grouped:
+      {
+	auto &group = static_cast<HIR::GroupedExpr &> (expr);
+	// get_expr_in_parens returns Reference (based on error logs) -> No '*'
+	return is_const_dependent (group.get_expr_in_parens ());
+      }
+
+    // For Arithmetic, Logical, Negation, etc. (which fall under Operator),
+    // we cannot safely distinguish symbolic vs concrete without RTTI/Visitors.
+    // We treat them as dependent (return true) to force Lazy Evaluation.
+    // This satisfies the maintainer's request to defer symbolic execution.
+    case HIR::Expr::ExprType::Operator:
+      return true;
+
+    // Default to true (dependent) for safety on unknown/complex types
+    default:
+      return true;
+    }
+}
+
 TyTy::BaseType *
 TypeCheckExpr::resolve_root_path (HIR::PathInExpression &expr, size_t *offset,
 				  NodeId *root_resolved_node_id)
@@ -366,6 +414,25 @@ TypeCheckExpr::resolve_root_path (HIR::PathInExpression &expr, size_t *offset,
       // turbo-fish segment path::<ty>
       if (seg.has_generic_args ())
 	{
+	  // Check for dependent const expressions (like { N + 1 })
+	  bool is_dependent = false;
+	  for (auto &arg : seg.get_generic_args ().get_const_args ())
+	    {
+	      if (is_const_dependent (*arg.get_expression ()))
+		{
+		  is_dependent = true;
+		  break;
+		}
+	    }
+
+	  if (is_dependent)
+	    {
+	      *root_resolved_node_id = ref_node_id;
+	      *offset = *offset + 1;
+	      root_tyty = lookup;
+	      continue;
+	    }
+
 	  lookup = SubstMapper::Resolve (lookup, expr.get_locus (),
 					 &seg.get_generic_args (),
 					 context->regions_from_generic_args (
@@ -524,6 +591,20 @@ TypeCheckExpr::resolve_segments (NodeId root_resolved_node_id,
 
       if (seg.has_generic_args ())
 	{
+	  // Check for dependent const expressions (like { N + 1 })
+	  bool is_dependent = false;
+	  for (auto &arg : seg.get_generic_args ().get_const_args ())
+	    {
+	      if (is_const_dependent (*arg.get_expression ()))
+		{
+		  is_dependent = true;
+		  break;
+		}
+	    }
+	  if (is_dependent)
+	    {
+	      continue;
+	    }
 	  rust_debug_loc (seg.get_locus (), "applying segment generics: %s",
 			  tyseg->as_string ().c_str ());
 	  tyseg
