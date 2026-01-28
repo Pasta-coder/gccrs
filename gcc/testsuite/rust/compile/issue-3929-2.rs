@@ -7,6 +7,7 @@ struct S {
 fn main() {
     let s = S{x: 1, y: 2};
     match s {
-        S{x: 1, ..} => {}
+        S{x: 1, ..} => {},
+        _ => {},
     }
 }

@@ -22,7 +22,6 @@
 #include "rust-system.h"
 #include "rust-hir-expr.h"
 #include "rust-hir-type-check.h"
-#include "rust-system.h"
 #include "rust-tyty.h"
 #include "optional.h"
 #include "rust-hir-visitor.h"
@@ -224,6 +223,14 @@ public:
   {
     Constructor c (ConstructorKind::VARIANT);
     c.variant_idx = variant_idx;
+    return c;
+  }
+
+  static Constructor make_int_range (int64_t lo, int64_t hi)
+  {
+    Constructor c (ConstructorKind::INT_RANGE);
+    c.int_range.lo = lo;
+    c.int_range.hi = hi;
     return c;
   }
 
