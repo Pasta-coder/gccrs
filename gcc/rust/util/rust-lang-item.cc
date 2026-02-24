@@ -118,6 +118,10 @@ const BiMap<std::string, LangItem::Kind> Rust::LangItem::lang_items = {{
 
   {"discriminant_kind", Kind::DISCRIMINANT_KIND},
   {"discriminant_type", Kind::DISCRIMINANT_TYPE},
+
+  {"owned_box", Kind::OWNED_BOX},
+  {"exchange_malloc", Kind::EXCHANGE_MALLOC},
+
   {"manually_drop", Kind::MANUALLY_DROP},
 }};
 
