@@ -156,6 +156,7 @@ public:
 
     OWNED_BOX,
     EXCHANGE_MALLOC,
+    BOX_FREE,
 
     MANUALLY_DROP,
   };
